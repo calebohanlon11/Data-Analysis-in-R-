@@ -1,0 +1,450 @@
+---
+title: "Final Assignment"
+author: "Caleb OHanlon 20456094"
+format: pdf
+editor: visual
+execute: 
+  warning: false
+  message: false
+---
+For this assignment I have chosen a dataset on the basic statstics of The EnglishPremier league season of 2022/2023. I aqcuired this dataset from "data.world". I have provided the link below:
+
+[Data.world](https://data.world/evangower/english-premier-league-2022-23-match-data/workspace/file?filename=epl_results_2022-23.csv)  (It may ask you to sign in)
+
+# Part 1: Analysis
+## Manipulation and Basic analysis
+```{r}
+library(readr)
+library(dplyr)
+library(knitr)
+
+Prem_data <- read_csv("Prem22-23.csv")
+sum(is.na(Prem_data)) 
+colnames(Prem_data)
+dataset_size <- dim(Prem_data)
+print(dataset_size)
+```
+I first loaded the readr, knitr and dplyr libraries and loaded in the "Prem22-23.csv" file under the variable name Prem_data.  I then checked for any NA values and checked the names of the columns. Finally, I calculated the dimensions (rows and columns) of the dataset and printed them to the console.
+```{r}
+duplicate_rows <- Prem_data[duplicated(Prem_data), ]
+if (nrow(duplicate_rows) > 0) {
+  print("Duplicate entries found:")
+  print(duplicate_rows)
+} else {
+  print("No duplicate entries found.")
+}
+```
+Here I checked for duplicates in the dataset and printed the answer to the console.
+```{r}
+if (class(Prem_data$Date)[1] == "Date") {
+  cat("The 'Date' variable is stored as a Date class.\n")
+} else {
+  Prem_data <- Prem_data %>%
+    mutate(Date = as.Date(Date, format = "%d/%m/%Y"))
+  cat("The 'Date' variable has been converted to Date class.\n")
+}
+```
+Here I've used an "if" statement to check if the "Date" variable is stored as a Date class and if it isn't to convert it to one. If the date variable isn't stored as a date class it may cause problems for filtering/sorting data, performing time series analysis or may behave unexpectedly and cause errors in other analysis
+```{r}
+library(skimr)
+Prem_data_fullnames <- Prem_data %>%
+  rename(
+    FullTimeHomeGoals = FTHG,
+    FullTimeAwayGoals = FTAG,
+    FullTimeResult = FTR,
+    HalfTimeHomeGoals = HTHG,
+    HalfTimeAwayGoals = HTAG,
+    HalfTimeResult = HTR,
+    HomeShots = HS,
+    AwayShots = AS,
+    HomeShotsOnTarget = HST,
+    AwayShotsOnTarget = AST,
+    HomeFouls = HF,
+    AwayFouls = AF,
+    HomeCorners = HC,
+    AwayCorners = AC,
+    HomeYellowCards = HY,
+    AwayYellowCards = AY,
+    HomeRedCards = HR,
+    AwayRedCards = AR
+  )
+skim_without_charts(Prem_data_fullnames)
+```
+
+Here, I've loaded in the "skimr" package to use the skim_without_charts() function to get a brief but detailed summary of the dataset and renaming each column to its full name for better readability of the summary table.
+
+This table provides a detailed summary of the Premier League 2022-23 dataset. Some key insights into the dataset include an average of 1.63 goals scored by home teams and 1.22 by away teams per match, with home teams generally having more shots (13.95) and shots on target (4.91) than away teams (11.31 and 3.89, respectively). Fouls are fairly balanced between home (10.6) and away (10.93) teams, while yellow and red cards are rare but slightly higher for away teams. The Date column covers the full 2022-23 season, ranging from August 5, 2022, to May 28, 2023, and matches typically kicked off between 12:00 PM and 8:15 PM.
+
+The percentile statistics reveal that home teams scored between 0 and 9 goals in a single match (p0 to p100), with 25% scoring 1 goal or fewer (p25) and a median of 1 goal (p50). Away teams scored between 0 and 6 goals, with 50% scoring 1 goal or fewer (p50). Home shots ranged from 1 (p0) to 33 (p100), with a median of 14 (p50), while away shots ranged from 1 to 30, with a median of 11. Yellow cards for home teams ranged from 0 to 6, with a median of 2, while away teams ranged from 0 to 7, with a median of 2. Performance metrics show tighter ranges for away teams.
+
+## Exploration 
+A common "theory" in modern day football sports betting is to "never back the early kick off" as it is seen to cause many upsets 
+
+```{r}
+selected_teams <- c("Liverpool", "Man City", "Man United", "Arsenal")
+
+Prem_data_filtered <- Prem_data %>%
+  filter(HomeTeam %in% selected_teams | AwayTeam %in% selected_teams)
+
+Prem_data_filtered <- Prem_data_filtered %>%
+  mutate(
+    KickoffCategory = ifelse(Time <= as.difftime("13:00:00",
+                                                 format = "%H:%M:%S"), 
+                             "1 PM or Earlier", 
+                             "Later")
+  )
+
+win_stats <- Prem_data_filtered %>%
+  mutate(
+    HomeWin = ifelse(FTR == "H" & HomeTeam %in% selected_teams, 1, 0),
+    AwayWin = ifelse(FTR == "A" & AwayTeam %in% selected_teams, 1, 0),
+    TotalWin = HomeWin + AwayWin
+  ) %>%
+  group_by(KickoffCategory) %>%
+  summarise(
+    TotalMatches = n(),
+    TotalWins = sum(TotalWin),
+    HomeWins = sum(HomeWin),
+    AwayWins = sum(AwayWin),
+    TotalWinPercentage = (TotalWins / TotalMatches) * 100,
+    HomeWinPercentage = (HomeWins / TotalMatches) * 100,
+    AwayWinPercentage = (AwayWins / TotalMatches) * 100
+  )
+win_stats %>%
+  kable(
+    caption = "Win Statistics for Selected Teams Based on Kickoff Time",
+    col.names = c(
+      "Kickoff Time",
+      "Total Matches",
+      "Total Wins",
+      "Home Wins",
+      "Away Wins",
+      "Total Win %",
+      "Home Win %",
+      "Away Win %"
+    )
+  )
+```
+Here I filtered the dataset to include matches involving the selected teams (Liverpool, Man City, Man United, and Arsenal) and categorized them by kickoff time (1 PM or earlier vs. later). I then calculated win statistics for each category, including total wins, home wins, away wins, and their respective percentages. The results are then displayed as a neatly formatted table using kable().
+
+The table explores the win statistics of Manchester City, Liverpool, Manchester United, and Arsenal based on kickoff times. Contrary to the "never back the early kickoff" theory, these teams achieved a solid win percentage of 63.16% in matches starting at 1 PM or earlier, with 36.84% of those wins occurring as the away team. This is only slightly lower than their win percentage in later kickoffs, where they won 69.42% of matches, with a stronger showing at home (44.63%). However, the home win percentage in early kickoffs is notably lower at 26.32%, indicating that these teams perform significantly worse at home in earlier matches compared to later games.
+
+**Conclusion:** 
+The data suggests that the "never back the early kickoff" theory may not entirely hold for the league's top teams, as they maintain a strong overall win record. However, their significantly worse home win percentage in early matches does suggest that the theory has some merit. So maybe "never back the early kick off at home". 
+
+
+
+
+```{r}
+library(ggplot2)
+win_chances <- Prem_data %>%
+  filter(HTR != "D") %>%
+  mutate(
+    HalfTimeLeader = ifelse(HTR == "H", "Home", "Away"), 
+    FullTimeWinner = ifelse(FTR == "H", "Home",
+                            ifelse(FTR == "A", "Away", "Draw")) 
+  ) %>%
+  group_by(HalfTimeLeader) %>%
+  summarise(
+    TotalLeads = n(),
+    WinsWhenLeading = sum(HalfTimeLeader == FullTimeWinner), 
+    WinPercentage = (WinsWhenLeading / TotalLeads) * 100 
+  )
+
+ggplot(win_chances, aes(x = HalfTimeLeader,
+                        y = WinPercentage,
+                        fill = HalfTimeLeader)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_text(
+    aes(label = paste0(round(WinPercentage, 1), "%")),
+    vjust = -0.5, 
+    size = 5 
+  ) +
+  labs(
+    title = "Win Percentage When Leading at Halftime",
+    x = "Half-Time Leader",
+    y = "Win Percentage (%)"
+  ) +
+  scale_fill_manual(values = c("Home" = "blue", "Away" = "red")) + 
+  scale_y_continuous(limits = c(0, 100),
+                     expand = expansion(mult = c(0, 0.1))) + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Here, I loaded in the ggplot2 package to create a graph.I began by filtering out, half time games that were draws "D", and assigned half time leaders to their respective home or away column. I then did the same for full time winners, and grouped the data by home or away.Lastly I created a won when leading variable, calculated the win percentage and then used the ggplot2 package to graph by data accordingly.
+
+
+
+This graph shows the win percentages for teams leading at halftime. Home teams successfully turn their halftime lead into a full-time win 84.1% of the time, while away teams achieve this 64.6% of the time. The results emphasize the home advantage in holding onto a lead and securing victory, but also the importance in assuring you score first in every game.
+
+In sports, accusations of referee bias are common, as human judgment is inherently subjective. A frequent complaint in Premier League football today is that Anthony Taylor is consistently biased against Chelsea, who would be considered as one of the top clubs in the premier league.
+```{r}
+library(tidyr)
+
+chelsea_data <- Prem_data %>%
+  filter(HomeTeam == "Chelsea" | AwayTeam == "Chelsea")
+
+chelsea_data <- chelsea_data %>%
+  mutate(
+    RefereeCategory = ifelse(Referee == "A Taylor",
+                             "With A Taylor",
+                             "Without A Taylor"),
+    IsWin = ifelse(
+      (FTR == "H" & HomeTeam == "Chelsea") |
+        (FTR == "A" & AwayTeam == "Chelsea"), 1, 0
+    )
+  )
+
+win_percentage <- chelsea_data %>%
+  group_by(RefereeCategory) %>%
+  summarise(
+    TotalMatches = n(),
+    TotalWins = sum(IsWin),
+    WinPercentage = (TotalWins / TotalMatches) * 100
+  ) %>%
+complete(RefereeCategory = c("With A Taylor", "Without A Taylor"),
+         fill = list(TotalMatches = 0, TotalWins = 0, WinPercentage = 0))
+
+win_percentage %>%
+  kable(
+    caption = 
+      "Chelsea's Win Percentage With and Without Anthony Taylor as Referee",
+    col.names = c("Referee",
+                  "Total Matches",
+                  "Total Wins",
+                  "Win Percentage (%)")
+  )
+```
+Here, I loaded the tidyr package to format the dataset. I began by filtering the dataset to include only matches involving Chelsea. Next, I categorized the matches based on whether Anthony Taylor was the referee or not and created a variable to determine if Chelsea won the match. The data was then grouped by referee category, and I calculated the total matches, total wins, and the win percentage for each group. Finally, I included both referee categories ("With A Taylor" and "Without A Taylor"), even if one had no matches, and displayed the results in a table using the knit::kable() function.
+
+This table highlights Chelsea's win percentages in matches officiated by Anthony Taylor compared to those without him. Out of 2 matches refereed by Taylor, Chelsea failed to secure a single win, resulting in a 0% win rate. In contrast, in the 36 matches without Taylor, Chelsea achieved a win percentage of 30.56%.
+
+Conclusion: While the sample size for matches refereed by Anthony Taylor is small, the data aligns with claims of Chelsea's poor results under his officiating. However, further analysis across more games would be required to substantiate any claims of bias. 
+
+
+
+
+
+
+# Part 2: R Package
+
+**R package:**"quantmod"
+
+**Author:**"Jeffrey A. Ryan and Joshua M. Ulrich"
+
+**Reference:** "CRAN: quantmod"
+
+The quantmod package is designed for financial data analysis and quantitative modeling. It's primary use is to simplify the retrieval, organisation, and visualization of financial market data. Using functions like getSymbols() for getting stock data (e.g Stock prices) and chartSeries() for creating dynamic charts (e.g times series models), the package helps for analysing stock trends, financial modeling, and the development of trading strategies.
+```{r}
+library(quantmod)
+
+getSymbols("TSLA", from = "2023-12-04", to= "2024-12-04")
+Stock1 <- getSymbols("TSLA", from = "2023-12-04", to= "2024-12-04",
+                     auto.assign = FALSE)
+head(Stock1)
+View(Stock1)
+
+#TSLA <- last(TSLA, "1 year")
+#head(TSLA)
+```
+
+Here, I retrieved the stock data for Tesla (TSLA) from Yahoo Finance using the getSymbols() function from the quantmod package, covering the period from December 4, 2023, to December 4, 2024. I then assigned it to Stock1 variable using auto.assign = FALSE, to make sure the dataset stored properly.I then inspected it using the head() and View() functions. The commented lines is another way of viewing the dataset from a selected timeframe.
+
+## Plotting dataset and returns 
+```{r}
+chartSeries(Stock1, type="line", subject="2024",
+            theme=chartTheme("white"))
+addEMA(n=30, on=1, col= "blue")
+```
+This chart shows Tesla's stock performance over the year 2024. The blue line represents a 30-day moving average, highlighting overall trends. The volume bars below provide insight into trading activity, with spikes indicating high market interest during certain periods.
+```{r}
+plot(Stock1$TSLA.Close)
+```
+This line chart tracks Tesla's closing prices daily over the same time period. The upward trend towards the end of the year highlights significant growth, while mid-year dips reflect periods of decline or volatility.
+```{r}
+Stock1.day <- dailyReturn(Stock1$TSLA.Close)
+plot(Stock1.day)
+```
+The graph of Tesla's daily returns captures short-term volatility. Most daily returns fluctuate within -0.1 to 0.1, with occasional sharp spikes indicating major price movements driven by external factors such as news or earnings reports.
+```{r}
+Stock1.week <- weeklyReturn(Stock1$TSLA.Close)
+plot(Stock1.week)
+```
+This chart highlights Tesla's weekly return fluctuations, showing periods of both gains and losses. The spikes in mid-2024 suggest weeks with higher-than-average performance, while some drops indicate short-term challenges or corrections.
+```{r}
+Stock1.month <- monthlyReturn(Stock1$TSLA.Close)
+plot(Stock1.month)
+summary(Stock1.month)
+```
+The monthly returns graph shows a mix of positive and negative performance, with higher variability in the latter half of the year. Notable peaks, such as in October 2024, indicate periods of strong growth, while troughs reflect months with significant losses or corrections.
+
+Here, I graphed the Tesla (TSLA) stock data using the chartSeries() function from the "quantmod" package, plotting a line graph for 2024. I added a 30-day Exponential Moving Average (EMA) line to the chart using the addEMA() function for trend analysis. Next, I used the plot() function to plot the closing prices(Stock1$TSLA.Close). I then calculated the daily, weekly, and monthly returns for Tesla's stock using the dailyReturn(), weeklyReturn(), and monthlyReturn() functions, plotting each for detailed return analysis. Finally, I summarized the monthly returns with the summary() function to view key statistics.
+
+Tesla's monthly returns show a range from -24.63% to 38.15%, highlighting significant volatility. The average return is 4.27%, with a median of 4.26%, suggesting consistent overall growth. Half of the returns fall between -4.5% and 11.12%, reflecting moderate variability with some extreme fluctuations.
+
+## Bootstrapping 
+```{r}
+hist(Stock1.week)
+```
+Here, I graphed the distribution of Tesla's (TSLA) weekly returns using a histogram to identify patterns in the data. We can see most weekly returns are concentrated near 0, with the highest frequency between -0.05 and 0.05, indicating modest price changes. Outliers range from -0.1 to 0.3, reflecting occasional significant gains or losses. The mean return is near zero, with moderate volatility, and approximately 75% of returns fall within -0.05 to 0.1, suggesting overall stability.
+```{r}
+value1 <- last(Stock1$TSLA.Close)
+value1
+```
+The most recent closing price was extracted using the last() function and stored in value1. In the case Tesla's was $351.42.
+```{r}
+ plot(NULL, 
+      xlim = as.Date(c(2023.12, 2024.12)),
+      ylim = c(100, 450 ),
+      xlab = "Time",
+      ylab = "TSLA Value")
+
+abline(h = value1, col = "blue", lty = 2)
+abline(h = 250, col = "red", lty = 2)
+```
+Here I plotted this value as a blue dashed reference line on a blank chart, with an additional red dashed line at $250 for comparison. This graph shows Tesla's current price relative to a fixed benchmark for further analysis.
+
+
+```{r}
+empirical_returns <- as.vector(Stock1.week)
+
+initial_value <- as.numeric(last(Stock1$TSLA.Close))
+
+n_simulations <- 1000  
+n_weeks <- 52          
+
+simulated_trajectories <- matrix(NA, nrow = n_weeks, ncol = n_simulations)
+
+
+set.seed(123) 
+for (i in 1:n_simulations) {
+  sampled_returns <- sample(empirical_returns, n_weeks, replace = TRUE)
+  sampled_returns
+  
+  
+  trajectory <- cumprod(1 + sampled_returns) * initial_value
+  simulated_trajectories[, i] <- trajectory
+}
+
+
+mean_trajectory <- rowMeans(simulated_trajectories)
+
+plot(NULL, xlim = c(1, n_weeks), ylim = range(simulated_trajectories), 
+     xlab = "Weeks Ahead", ylab = "TSLA Price", 
+     main = "Simulated Forecast Trajectories for TSLA")
+
+for (i in 1:n_simulations) {
+  lines(1:n_weeks, simulated_trajectories[, i], col = "grey", lwd = 0.5)
+}
+
+lines(1:n_weeks, mean_trajectory, col = "blue", lwd = 2)
+abline(h = initial_value, col = "red", lty = 2)
+legend("topright", legend = c("Individual Trajectories",
+                              "Mean Trajectory",
+                              "Initial Value"), 
+       col = c("grey", "blue", "red"), lty = c(1, 1, 2), lwd = c(0.5, 2, 1))
+```
+
+Here, I converted Tesla's (TSLA) weekly returns into a vector using as.vector() and set the initial stock price to the most recent closing value with last(). I defined parameters for 1,000 simulations over a 52-week horizon and initialized a matrix to store the simulated price trajectories.
+
+Using bootstrapping, I generated 1,000 price trajectories by sampling weekly returns with replacement and calculating cumulative price paths with cumprod(). I then calculated mean trajectory was using the rowMeans() function, and the results were graphed. Each simulated trajectory was plotted in gray, the mean trajectory was plotted as a blue line, and the initial price was marked with a red dashed line for reference. This graph illustrates the potential range and average forecast for Tesla's stock price over the next year.
+
+```{r}
+summary(sampled_returns)
+```
+The sampled weekly returns for Tesla (TSLA) show a generally positive distribution, with a mean return of 4% and a median of 1.17%, indicating consistent small gains. The maximum weekly return of 29% highlights the potential for substantial short-term growth, while the minimum return of -14% reflects the stock's downside risk. The 1st and 3rd quartiles (-1.3% and 5.3%) suggest that most weeks fall within a moderate range of losses and gains, showcasing Tesla's mix of volatility and growth potential.
+
+
+
+
+# Part 3: Functions/Programming 
+```{r}
+linear_regression_analysis <- function(data, response, predictors) {
+  if (!is.data.frame(data)) stop("Data must be a data frame.")
+  
+  formula <- as.formula(paste(response, "~",
+                              paste(predictors, collapse = "+")))
+  
+  model <- lm(formula, data = data)
+  
+  result <- list(
+    model = model,
+    formula = formula,
+    data = data,
+    response = response,
+    predictors = predictors
+  )
+  
+  class(result) <- "linear_regression_analysis"
+  return(result)
+}
+```
+Here, I created a "linear_regression_analysis()" to perform a simple linear regression. First, it checks to make sure the data being used is in the correct format (a data frame). Then, it builds the formula for the regression using the response variable (what you want to predict) and the predictors (the factors affecting it). Lastly, it uses the lm() function to create the regression model using this formula and the dataset, so we can perform a linear regression analysis.
+  
+Next, I stored the regression outputs (model, formula, data, response, and predictors) in a list and assigned it the class "linear_regression_analysis" using the class() function.
+
+ By assigning the list the S3 class "linear_regression_analysis", we transform it into an S3 object. This means I can use specific methods like print(), summary(), and plot() for customized outputs specific to this class. S3 classes are easier for organizing regression results in a structured format, making the object easy to use and for analysis.
+
+```{r}
+print.linear_regression_analysis <- function(x, ...) {
+  cat("Linear Regression Analysis\n")
+  cat("Formula:", deparse(x$formula), "\n")
+  cat("Number of Observations:", nrow(x$data), "\n")
+  cat("Response Variable:", x$response, "\n")
+  cat("Predictor Variables:", paste(x$predictors, collapse = ", "), "\n")
+  invisible(x)
+}
+summary.linear_regression_analysis <- function(x, ...) {
+  cat("Summary of Linear Regression Analysis\n")
+  cat("Formula:", deparse(x$formula), "\n\n")
+  print(summary(x$model))
+  invisible(x)
+}
+plot.linear_regression_analysis <- function(x, ...) {
+  par(mfrow = c(2, 2), mar = c(4, 4, 2, 1), oma = c(0, 0, 2, 0))   
+  plot(x$model, id.n = 1, cex.id = 0.8)         
+  par(mfrow = c(1, 1))  
+}
+```
+Here, I created custom methods for the S3 class "linear_regression_analysis". The print() method gives an overview of the analysis, (e.g formula, number of observations, response variable, and predictors). The summary() method gives more statistical information about the regression model (e.g coefficients and residuals), by using the built-in summary() function for linear models. The plot() method graphs diagnostic plots (e.g residuals vs. fitted values and Q-Q plots), by using the default plots for the regression model.
+
+
+**Example Dataset:** 
+```{r}
+data("mtcars")
+
+response <- "mpg"
+predictors <- c("wt", "hp")
+
+result <- linear_regression_analysis(data = mtcars,
+                                     response = response,
+                                     predictors = predictors)
+
+print(result)
+
+summary(result)
+
+plot(result)
+```
+Here, I applied the linear_regression_analysis() function to the "mtcars" dataset, using mpg as the response variable and wt and hp as predictors.Next I assigned the function with the inputs to the result variable and used the print(), summary() and plot() methods on the result.
+
+The print() output provides a short overview of the linear regression model, showing the formula mpg ~ wt + hp with 32 observations. The response variable is mpg, and the predictors are wt (weight) and hp (horsepower).
+
+The summary() output provides detailed statistics for the linear regression model mpg ~ wt + hp. The residuals indicate the variation not explained by the model, with a range from -3.941 to 5.854. The coefficients show the relationships: for every unit increase in wt, mpg decreases by 3.88, while for every unit increase in hp, mpg decreases by 0.032. Both predictors are statistically significant, with p-values < 0.01. The model explains 82.68% of the variance in mpg (R-squared = 0.8268) and has a strong overall fit (F-statistic = 69.21, p-value < 0.001).
+
+### The plot() output gives us 4 graphs:
+
+**Residuals vs. Fitted:** 
+This plot checks for non-linearity. The residuals are scattered randomly around zero, indicating a reasonably linear relationship between predictors and the response variable, although some deviation is visible at extreme fitted values.
+
+**Normal Q-Q:**
+This plot assesses the normality of residuals. Most points follow the diagonal line, suggesting that residuals are approximately normally distributed, though some outliers (e.g., Chrysler Imperial) deviate from normality.
+
+**Scale-Location:** 
+This plot tests homoscedasticity (equal variance). The residuals appear randomly spread, with some increase in variance at higher fitted values, suggesting potential heteroscedasticity.
+
+**Residuals vs. Leverage:**
+This plot identifies influential observations. Points like Chrysler Imperial and Maserati Bora have higher leverage, indicating they may significantly influence the regression results.
+
+
+
