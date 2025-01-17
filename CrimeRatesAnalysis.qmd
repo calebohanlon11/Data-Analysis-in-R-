@@ -1,0 +1,242 @@
+---
+title: "Assignment 1"
+author: "Caleb O'Hanlon 20450694"
+format: pdf
+editor: visual
+execute: 
+  warning: false
+  message: false
+---
+
+## Task 1: Manipulation
+
+Q1.
+
+```{r}
+library(readxl)
+setwd("C:\\Users\\verbi\\OneDrive\\Desktop\\R scripts\\DpwR\\Assignment 1")
+my_data <- read_excel("as1_data.xlsx", .name_repair = "unique")
+getwd()
+
+```
+
+Here, I've installed and loaded the packages I needed to load the data set and set my working directory. Once that was done I assigned the data to the variable "new_data" and made some changes to the data before I began analysing it. There was no usable data in the first 8 rows so I skipped them and I also appended any ":" in the data with "NA" so my code could read missing values.
+
+```{r}
+new_data <- read_excel("as1_data.xlsx", skip = 8)
+new_data[new_data == ":"] <- NA
+new_data <- new_data[1:41, ]
+```
+
+Q2.
+
+Here, I've used the dimension function to get the number of rows (41 countries) and columns (22 crimes) in the dataset.
+
+```{r}
+dim(new_data) #41 x 22
+```
+
+.
+
+Q3.
+
+Next using the colnames() function I changed 1st column name to "Country".
+
+```{r}
+colnames(new_data)[1] <- "Country"
+```
+
+Q4.
+
+```{r}
+columns_to_remove <- c(
+  "Child pornography",
+  "Rape",
+  "Sexual assault",
+  "Theft",
+  "Theft of a motorized vehicle or parts thereof",
+  "Burglary",
+  "Burglary of private residential premises"
+)
+
+new_data2 <- new_data[, !(colnames(new_data) %in% columns_to_remove)]
+```
+
+Now I've created the variable "columns to remove" with a vector with the columns I want to remove and using the logical operator I've cleaned the dataset of these columns as "Child Pornography" is empty, and the other columns are already accounted for elsewhere in the dataset.
+
+Q5.
+
+Here, I've selected any rows with missing data in them (NA's) and assigned them to a variable.
+
+```{r}
+library(knitr)
+library(dplyr)
+NA_rows <- rowSums(is.na(new_data2[, -1])) > 0 
+NA_countries <- new_data2[NA_rows, 1]
+
+NA_countries %>%  
+  kable(col.names = c("Country"),
+      caption = "Country with missing Data",
+      align = c("l"))
+```
+
+Q6.
+
+Now I can clean the dataset by removing any countries with missing data.
+
+```{r}
+new_data_clean <- new_data2[!NA_rows,]
+```
+
+Q7.
+
+```{r}
+new_data_clean[, -1] <- lapply(new_data_clean[, -1], function(x) as.numeric(as.character(x)))
+new_data_clean$Total_Offenses <- rowSums(new_data_clean[, -1], na.rm = TRUE)
+```
+
+Q8.
+
+```{r}
+dataset_dimensions <- dim(new_data_clean)
+num_observations <- dataset_dimensions[1]
+num_variables <- dataset_dimensions[2]
+cat("Number of observations (countries):", num_observations, "\n")
+ cat("Number of variables (crimes):", num_variables, "\n")
+```
+
+Here, I've created a variable for the dimensions and assigned the dim() function to it. Once that was done I created 2 more variables and selected each dimensio using indexing to get my number of observations and variables. ##Task 2: Analysis Q1.
+
+```{r}
+colnames(new_data_clean)
+
+
+library(kableExtra)
+organizekableExtraorganized_crime_table <- new_data_clean[, c("Country", "Participation in an organized criminal group")]
+
+
+organized_crime_table <- new_data_clean %>%
+  select(Country, Participation = `Participation in an organized criminal group`) %>% 
+  arrange(desc(Participation))
+
+organized_crime_table %>%
+  kable("latex", escape = FALSE) %>%
+  kable_styling("striped", full_width = F)
+
+```
+
+Q2.
+
+```{r}
+highest_participation_country <- new_data_clean %>%
+  slice_max(order_by = `Participation in an organized criminal group`, n = 1) %>% 
+  pull(Country) 
+
+print(highest_participation_country)
+
+
+```
+
+Q3.
+
+```{r}
+library(ggplot2)
+
+new_data_clean$Robbery <- as.numeric(as.character(new_data_clean$Robbery))
+new_data_clean$`Unlawful acts involving controlled drugs or precursors` <- as.numeric(as.character(new_data_clean$`Unlawful acts involving controlled drugs or precursors`))
+
+ggplot(new_data_clean, aes(x = Robbery, y = `Unlawful acts involving controlled drugs or precursors`, label = Country)) +
+  geom_point(color = "green", size = 4) +  # Increased size of the points
+  geom_text(position = position_nudge(y = 5), size = 3.5) +  # Nudge labels up for better readability
+  labs(
+    title = "Relationship Between Robbery and Unlawful Acts Involving Controlled Drugs",
+    x = "Robbery",
+    y = "Unlawful Acts Involving Controlled Drugs or Precursors"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10),
+    axis.title.x = element_text(size = 8),
+    axis.title.y = element_text(size = 8),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7)
+  ) +
+  xlim(0, 150) +
+  ylim(0, 500)
+
+
+
+```
+
+## Task 3: Creative
+
+Q1.
+
+```{r}
+ggplot(new_data_clean, aes(x = `Participation in an organized criminal group`, y = Total_Offenses)) +
+  geom_point(color = "red", size = 4) +  # Points colored red
+  geom_text(aes(label = Country), position = position_nudge(y = 10), size = 3) +  
+  geom_smooth(method = "lm", color = "blue", se = FALSE) + 
+  labs(
+    title = "Relationship Between Participation in Organized Crime and Total Offenses",
+    x = "Participation in Organized Crime (per 100,000 people)",
+    y = "Total Offenses (per 100,000 people)"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10),
+    axis.title.x = element_text(size = 8),
+    axis.title.y = element_text(size = 8)
+  )
+
+
+```
+
+A reasonable hypothesis to make before observing the graph would be that higher number of participation in organised crime would lead to a greater number of total offenses in each country. However apart from Spain being the outlier where this would seem true, all the other countries seem to suggest that participation in organised crime has no correlation with total offenses. Furthermore in countries such as Finland, Germany and Austria it would suggest the opposite. That in fact lower levels of participation in organised crime leads to higher levels of total offenses.
+
+Q2.
+
+```{r}
+new_data_cleanQ3 <- new_data_clean
+new_data_cleanQ3$Region <- case_when(
+  new_data_cleanQ3$Country %in% c("Austria","Germany", "Greece", "Spain", "Italy", "Finland", "Malta") ~ "West",
+  new_data_cleanQ3$Country %in% c("Bulgaria", "Czechia", "Romania", "Croatia", "Slovenia", "Albania", "Lithuania") ~ "East",
+)
+
+
+sexual_violence_summary <- new_data_cleanQ3 %>%
+  group_by(Region) %>%
+  summarise(Average_Sexual_Violence = mean(`Sexual violence`, na.rm = TRUE))
+
+
+p1 <- ggplot(sexual_violence_summary, aes(x = Region, y = Average_Sexual_Violence, fill = Region)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_text(aes(label = round(Average_Sexual_Violence, 1)), vjust = -0.3, size = 3) +
+  labs(
+    title = "Comparison of Sexual Violence Between East and West Europe",
+    x = "Region",
+    y = "Average Sexual Violence (per 100,000 people)"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10),
+    axis.title.x = element_text(size = 8),
+    axis.title.y = element_text(size = 8),
+    legend.position = "none"
+  )
+
+region_legend <- data.frame(
+  East = c("Bulgaria", "Czechia", "Romania", "Croatia", "Slovenia", "Albania", "Lithuania"),
+  West = c("Austria", "Germany", "Greece", "Spain", "Italy", "Finland", "Malta")
+  
+)
+
+library(gridExtra)
+grid.arrange(
+  p1,
+  tableGrob(region_legend),
+  ncol = 2,  
+  widths = c(2.5, 1.2)
+)
+```
+
+Here, we can see a significant contrast between sexual violence in Eastern and Western European countries. The average rate of sexual violence in the East is 11.9 per 100,000 people, whereas the average in the West is much higher at 40.7 per 100,000 people. This huge difference may be attributed to a variety of factors, including differences in the legal systems, societal norms, and reporting accuracy across regions. Additionally, Western countries might have higher reporting rates due to stronger legal protections for victims and increased public awareness, which could contribute to this difference. Understanding the causes behind these discrepancies is essential for addressing sexual violence across the continent.
