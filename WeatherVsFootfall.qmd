@@ -1,0 +1,320 @@
+---
+title: "Assignment 2"
+author: "Caleb O'Hanlon 20456094"
+format: pdf
+editor: visual
+execute: 
+  warning: false
+  message: false
+---
+
+# Task 1: Manipulation
+
+### Q1.
+
+```{r}
+library(readr)
+library(dplyr)
+pedestrian_data <- read_csv("pedestrian_2023.csv", 
+                            show_col_types = FALSE) %>%
+  as_tibble()
+pedestrian_data_cleaned <- pedestrian_data %>%
+  select(-ends_with("IN"), -ends_with("OUT"))
+dataset_size <- dim(pedestrian_data_cleaned)
+print(dataset_size)
+```
+I first loaded the readr and dplyr libraries and loaded in the pedestrian_2023.csv file as a tibble named pedestrian_data, suppressing column type messages for better presentation the quarto document. I then created a cleaned version of the data, pedestrian_data_cleaned, by removing columns ending in "IN" or "OUT." Finally, I calculated the dimensions (rows and columns) of the cleaned data and printed them to the console.
+
+### Q2.
+```{r}
+if (!inherits(pedestrian_data_cleaned$Time, "POSIXct") && 
+    !inherits(pedestrian_data_cleaned$Time, "Date")) {
+  pedestrian_data_cleaned$Time <- as.POSIXct(pedestrian_data_cleaned$Time, 
+                                             format = "%d/%m/%Y %H:%M", 
+                                             tz = "GMT")
+}
+
+pedestrian_data_cleaned <- pedestrian_data_cleaned %>%
+  mutate(across(-Time, as.numeric))
+
+if (inherits(pedestrian_data_cleaned$Time, "POSIXct") || 
+    inherits(pedestrian_data_cleaned$Time, "Date")) {
+print("The 'Time' column is stored with an appropriate class for a date.")
+} else {
+print("The 'Time' column is not stored with an appropriate class for a date.")
+}
+```
+Here, I used a series of "if" statements to ensure the "Time" column was in the correct date-time format. If Time wasn’t already POSIXct or Date, I converted it to POSIXct with GMT time. Then, I made all other columns numeric for consistency. Lastly, I checked and confirmed that Time was properly formatted, printing a message based on the result.
+
+### Q3.
+```{r}
+weather_2023 <- read_delim("weather_2023.txt", delim = "\t", col_names = TRUE, 
+                           show_col_types = FALSE)
+colnames(weather_2023) <- c("Timestamp", "Rainfall", 
+                            "Temperature", "WindSpeed", "CloudAmount")
+dataset_size_weather <- dim(weather_2023)
+print(dataset_size_weather)
+```
+I started by reading in the weather_2023.txt file using tab as the delimiter, loading it into weather_2023 and suppressing column type messages again for neater presentation in the quarto document. I then renamed the columns to Timestamp, Rainfall, Temperature, WindSpeed, and CloudAmount.Lastly, I checked the dimensions of the dataset and stored them in dataset_size_weather and printed them to the console.
+
+### Q4.
+```{r}
+weather_2023$CloudAmount <- factor(weather_2023$CloudAmount, ordered = TRUE)
+levels(weather_2023$CloudAmount)
+is.ordered(weather_2023$CloudAmount)
+```
+I converted the CloudAmount column in weather_2023 to an ordered factor, making sure the categories have a specific order. Then, I checked the levels of CloudAmount to see the categories, and used is.ordered to confirm it’s correctly set as ordered.
+
+### Q5.
+```{r}
+library(skimr)
+skim_without_charts(weather_2023)
+```
+
+The skim_without_charts() function provides a quick summary of each variable in the dataset, Showing: data types, basic statistics (mean, standard deviation, min, max), missing value counts and date ranges for date-time variables.
+
+### Q6.
+```{r}
+if (!inherits(weather_2023$Timestamp, "POSIXct") && 
+    !inherits(weather_2023$Timestamp, "Date")) {
+  weather_2023$Timestamp <- as.POSIXct(weather_2023$Timestamp, 
+                                       format = "%d/%m/%Y %H:%M", tz = "GMT")
+}
+
+weather_2023 <- weather_2023 %>%
+  mutate(across(-Timestamp, as.numeric))
+
+if (inherits(weather_2023$Timestamp, "POSIXct") || 
+    inherits(weather_2023$Timestamp, "Date")) {
+print("The 'Timestamp' column is stored with an appropriate class for a date.")
+} else {
+print("The 'Timestamp' column isn't stored with an appropriate class for a date.
+      ")
+}
+
+time_range_weather <- range(weather_2023$Timestamp, na.rm = TRUE)
+time_range_pedestrian <- range(pedestrian_data_cleaned$Time, na.rm = TRUE)
+
+if (identical(time_range_weather, time_range_pedestrian)) {
+  print("The ranges of 'Time' in both datasets are the same.")
+} else {
+  print("The ranges of 'Time' in both datasets are different.")
+}
+print(time_range_weather)
+```
+Again, I used a series of "if" statements to ensure the Timestamp column in weather_2023 was in the correct date-time format. First, I checked if Timestamp wasn’t already POSIXct or Date. If it wasn’t, I converted it to POSIXct with the GMT time zone for consistency. Then, I converted all columns except Timestamp to numeric with mutate(across(-Timestamp, as.numeric)) for uniform formatting.I then checked if Timestamp was correctly formatted, printing a message to confirm. I also compared the time ranges of Timestamp in weather_2023 and Time in pedestrian_data_cleaned, printing whether they matched or didn't match, and displayed the range for weather_2023.
+
+### Q7.
+```{r}
+pedestrian_data_cleaned <- pedestrian_data_cleaned %>%
+  distinct(Time, .keep_all = TRUE)
+
+weather_2023 <- weather_2023 %>%
+  distinct(Timestamp, .keep_all = TRUE)
+
+joined_data <- left_join(weather_2023, 
+                      pedestrian_data_cleaned, by = c("Timestamp" = "Time"))
+joined_dataset_size <- dim(joined_data)
+joined_dataset_size
+```
+Here, I removed duplicate entries from both pedestrian_data_cleaned and weather_2023, keeping only unique rows based on the Time column in pedestrian_data_cleaned and Timestamp in weather_2023. Then, I used a left_join to merge weather_2023 with pedestrian_data_cleaned by matching Timestamp and Time.Lastly, I checked the dimensions of the joined dataset and stored them in joined_dataset_size to see the size of the new dataset.
+
+### Q8.
+```{r}
+joined_data <- joined_data %>%
+  mutate(
+  Day_of_Week = factor(weekdays(Timestamp), levels = c("Sunday", "Monday", 
+                                                      "Tuesday", "Wednesday", 
+                                          "Thursday", "Friday", "Saturday"),
+                         ordered = TRUE),
+  Month = factor(months(Timestamp), levels = c("January", "February", "March", 
+                                          "April", "May", "June", 
+                                          "July", "August", "September", 
+                                          "October", "November", "December"), 
+                   ordered = TRUE)
+  )
+
+if (inherits(joined_data$Day_of_Week, "ordered") && 
+    inherits(joined_data$Month,"ordered")) {
+  print("Both 'Day_of_Week' and 'Month' are ordered factors.")
+} else {
+  print("Either 'Day_of_Week' or 'Month' is not an ordered factor.")
+}
+```
+Here, I added two new columns, Day_of_Week and Month, to joined_data. Day_of_Week uses the weekdays function on the Timestamp column to assign the day of the week, ordered from Sunday to Saturday and Month uses the months function to assign the month, ordered from January to December. Then I used an if statement to checked both Day_of_Week and Month were stored as ordered factors, printing a message to confirm if they were correctly set.
+
+### Q9.
+```{r}
+joined_data <- joined_data %>%
+  relocate(Day_of_Week, Month, .after = Timestamp)
+print(colnames(joined_data))
+```
+Here, I moved the Day_of_Week and Month columns to appear immediately after the Timestamp column in joined_data using the relocate function. Then, I printed the column names of joined_data to show the new order.
+
+# Task 2: Analysis
+### Q1.
+```{r}
+weather_columns <- c("Rainfall", "Temperature", "WindSpeed", "CloudAmount")
+pedestrian_traffic_columns <- setdiff(names(joined_data), c("Timestamp",
+                                    "Month", "Day_of_Week", weather_columns))
+
+
+joined_data$total_traffic <- NA
+joined_data$total_traffic <- rowSums(joined_data[, 
+                                    pedestrian_traffic_columns], na.rm = TRUE)
+total_traffic_per_month <- tapply(joined_data$total_traffic, 
+                                  joined_data$Month, sum, na.rm = TRUE)
+max_month <- names(total_traffic_per_month)[which.max(total_traffic_per_month)]
+min_month <- names(total_traffic_per_month)[which.min(total_traffic_per_month)]
+
+print(paste("Month with the highest traffic:", max_month, 
+            ", Month with the lowest traffic:", min_month))
+
+```
+Here, I defined weather_columns to specify the weather-related columns, then used setdiff to identify the pedestrian traffic columns in joined_data ignoring weather and time columns. I then initialized total_traffic as NA to prevent accumulation of the values per month on multiple runs. Next, I calculated the total pedestrian traffic per row with rowSums across the identified traffic columns. Using tapply, I then summed the monthly totals for total_traffic and found the months with the highest and lowest traffic, which I printed in the console.
+
+### Q2.
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+locations <- c("Capel st/Mary street",
+               "Grafton Street/CompuB", 
+               "Richmond st south/Portabello Harbour inbound")
+
+footfall_data <- joined_data %>%
+  select(Timestamp, Month, Day_of_Week, total_traffic, 
+         "Capel st/Mary street", "Grafton Street/CompuB",
+         "Richmond st south/Portabello Harbour inbound") %>%
+  mutate(Date = as.Date(Timestamp)) %>%
+  gather(key = "Location", value = "Footfall", 
+         "Capel st/Mary street", "Grafton Street/CompuB",
+         "Richmond st south/Portabello Harbour inbound") %>%
+  drop_na(Footfall)  
+
+#Daily Pedestrian Footfall in 3 locations
+ggplot(footfall_data, aes(x = Date, y = Footfall, color = Location)) +
+  geom_smooth(method = "loess", se = FALSE, size = 1, na.rm = TRUE) + 
+  geom_vline(xintercept = as.numeric(as.Date("2023-03-17")), 
+             linetype = "dashed", color = "red") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-12-25")), 
+             linetype = "dashed", color = "green") +
+  labs(title = "Daily Pedestrian Footfall in Three Locations", 
+       x = "Date", 
+       y = "Footfall Count", 
+       color = "Location") +
+  scale_x_date(
+    limits = c(min(footfall_data$Date), max(footfall_data$Date)),  
+    breaks = "3 months", 
+    labels = scales::date_format("%b %Y") 
+  ) +
+  scale_y_continuous(
+    labels = scales::comma_format(),  
+    breaks = seq(0, max(footfall_data$Footfall, na.rm = TRUE), by = 500)
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom"
+  )
+```
+Here, I loaded the necessary libraries and selected data from joined_data for three locations. Then, I reshaped the data to a long format for easier plotting, added a Date column, and removed rows with missing values. Using ggplot2, I plotted daily pedestrian footfall for each location with a smoothed line to show trends. I added dashed vertical lines for St. Patricks day and Christmas Day to highlight the dates. Finally, I customized the x-axis to show every three months, formatted with month and year, and adjusted the y-axis for better readability.
+
+### Q3.
+```{r}
+library(knitr)
+library(lubridate)
+seasonal_data <- joined_data %>%
+  select(Timestamp, "Temperature", "Rainfall", "WindSpeed") %>%
+  mutate(Date = as.Date(Timestamp)) %>%
+  mutate(Season = case_when(
+    month(Date) %in% c(12, 1, 2) ~ "Winter",
+    month(Date) %in% c(3, 4, 5) ~ "Spring",
+    month(Date) %in% c(6, 7, 8) ~ "Summer",
+    month(Date) %in% c(9, 10, 11) ~ "Autumn",
+    TRUE ~ "Unknown"
+  ))
+
+seasonal_stats <- seasonal_data %>%
+  group_by(Season) %>%
+  summarize(
+    Min_Temperature = min(Temperature, na.rm = TRUE),
+    Max_Temperature = max(Temperature, na.rm = TRUE),
+    Mean_Precipitation = mean(Rainfall, na.rm = TRUE),
+    Mean_WindSpeed = mean(WindSpeed, na.rm = TRUE)
+  )
+kable(seasonal_stats, caption = "Seasonal Statistics Table")
+```
+Here, I selected Temperature, Rainfall, and WindSpeed columns from joined_data, added a Date column, and assigned each date to a Season (Winter, Spring, Summer, Autumn) based on the month. Then, I grouped the data by Season to calculate minimum and maximum temperatures, mean precipitation, and mean wind speed.Lastly, I used kable to display these seasonal statistics in a table.
+ 
+
+# Task 3: Creativity
+### Plot
+```{r}
+joined_data$Hour <- format(joined_data$Timestamp, "%H")
+joined_data$Hour <- as.numeric(joined_data$Hour)
+
+hourly_traffic <- joined_data %>%
+  group_by(Hour) %>%
+  summarize(Total_Footfall = sum(total_traffic, na.rm = TRUE))
+
+footfall_max <- max(hourly_traffic$Total_Footfall, na.rm = TRUE)
+
+
+
+
+ggplot(hourly_traffic, aes(x = Hour, y = Total_Footfall)) +
+  geom_line(color = "blue", size = 1) + 
+  geom_point(color = "red") +  
+  scale_x_continuous(
+    breaks = seq(0, 24, by = 3),  
+    labels = function(x) {
+      paste0(sprintf("%02d", x), ":00")
+    }
+  ) +
+  scale_y_continuous(
+    labels = function(x) {
+      format(x / 1e6, digits = 2, big.mark = ",", scientific = FALSE)
+    }
+  ) +
+  labs(title = "Distribution of Pedestrian Footfall by Hour of the Day",
+       x = "Hour of the Day", 
+       y = "Total Footfall (Millions)") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+  This graph shows the distribution of pedestrian footfall throughout the day, with peaks and troughs at specific hours. Foot traffic is lowest in the early morning hours (around 3:00-6:00 am) and gradually increases through the morning, peaking around midday (12:00-15:00) as people are likely out for lunch or other activities. Another peak is observed in the early evening (around 18:00), likely due to the end of the workday and people commuting home or socializing. Footfall then decreases as the night gets later.
+  
+  This pattern seems to reflect common urban pedestrian movement. Such as low traffic at night, increasing during work hours and lunch, peaking in the evening, and dropping later. This information could be used to plan public transport times and routes, retail hours, and other city services.
+
+
+
+### Table
+```{r}
+joined_data$Rainfall_Category <- case_when(
+  joined_data$Rainfall == 0 ~ "No Rain",
+  joined_data$Rainfall > 0 & joined_data$Rainfall <= 2.5 ~ "Low Rain",
+  joined_data$Rainfall > 2.5 & joined_data$Rainfall <= 7.5 ~ "Moderate Rain",
+  joined_data$Rainfall > 7.5 ~ "High Rain",
+  TRUE ~ "Unknown"
+)
+rainfall_footfall_summary <- joined_data %>%
+  group_by(Rainfall_Category) %>%
+  summarize(Total_Footfall = sum(total_traffic, na.rm = TRUE))
+
+rainfall_footfall_summary$Rainfall_Category <- 
+  factor(rainfall_footfall_summary$Rainfall_Category, 
+              levels = c("High Rain", "Moderate Rain", "Low Rain", "No Rain"))
+
+rainfall_footfall_summary <- rainfall_footfall_summary %>%
+  arrange(Rainfall_Category)
+
+kable(rainfall_footfall_summary, caption = "Rainfall Vs. Footfall Summary")
+```
+
+  This table summarizes pedestrian footfall based on rainfall levels, categorized as "No Rain," "Low Rain," "Moderate Rain," and "High Rain." Foot traffic is highest when there is no rain (over 210 million), decreases with "Low Rain," and drops significantly with "Moderate Rain" and "High Rain." This pattern shows us that pedestrian movement is heavily influenced by rainfall, with fewer people outside as rainfall levels increase.
+  
+  This information could be used by urban planners, retailers, and event organizers to anticipate pedestrian traffic based on weather. By understanding how rain affects footfall, they could plan better for busy or quiet periods, e.g: adjust public transport levels, adjust staffing or planning outdoor events to optimize resources.
+
+
+
